@@ -21,8 +21,9 @@ function parse(file, dest, key, langArr) {
         //遍历多国语内容
         var langObj = {};
         for (var row = 0, rlen = ws.length; row < rlen; row++) { //遍历表格行
+
             if (!ws[row][key]) {
-                throw new Error('not find key `' + key + '` in excel!');
+                console.warn('[WARN]:not find key `' + key + '` in excel!\r\n');
             }
             if (!langArr) {//如果没有指定需要输出的语言,则
               for (var col in ws[row]) { //遍历表格列,ws[row]表示一行的内容, col表示列头

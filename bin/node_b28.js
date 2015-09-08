@@ -7,7 +7,7 @@ var jsdom = require('jsdom'),
     xlsxWriter = require('./libs/xlsx-write');
 
 var includes = '**.{js,html,htm,asp,tpl}';
-var excludes = '**{.svn,jquery,reasy,.min.js,shiv.js,respond.js,b28,shim.js,/libs/}**';
+var excludes = '**{.svn,.git,jquery,reasy,.min.js,shiv.js,respond.js,b28,shim.js,/libs/,/goform/,/cgi-bin/}**';
 //或['.svn', 'goform', 'css', 'images', 'lang', 'fis', 'config.js', 'release.js'];
 
 
@@ -23,33 +23,6 @@ var gfileList = [],
         dict: null //翻译模式时需要指定
     },
     jsonDict = {};
-
-
-
-var easyUTF8 = function(gbk) {
-    if (!gbk) {
-        return '';
-    }
-    var utf8 = [];
-    for (var i = 0; i < gbk.length; i++) {
-        var s_str = gbk.charAt(i);
-        if (!(/^%u/i.test(escape(s_str)))) {
-            utf8.push(s_str);
-            continue;
-        }
-        var s_char = gbk.charCodeAt(i);
-        var b_char = s_char.toString(2).split('');
-        var c_char = (b_char.length == 15) ? [0].concat(b_char) : b_char;
-        var a_b = [];
-        a_b[0] = '1110' + c_char.splice(0, 4).join('');
-        a_b[1] = '10' + c_char.splice(0, 6).join('');
-        a_b[2] = '10' + c_char.splice(0, 6).join('');
-        for (var n = 0; n < a_b.length; n++) {
-            utf8.push('%' + parseInt(a_b[n], 2).toString(16).toUpperCase());
-        }
-    }
-    return utf8.join('');
-};
 
 
 function unique(inputs, type) {
@@ -82,7 +55,7 @@ function readDict(filename) { //读取字典
 }
 
 function writeExcel(filename, array) { //以xlsx形式写入
-    xlsxWriter.write(filename, '', array, {
+    xlsxWriter.write(filename, 'translate', array, {
         wscols: [{
             wch: 30
         }, {
@@ -101,7 +74,7 @@ function writeText(filename, content) { //以文本形式写入
     console.log(filename + ' success saved!');
 }
 
-function writeFile(saveTo, array) { //提取写入部分
+function writeFile(saveTo, array) { //文件写入
     saveTo = path.resolve(saveTo);
     if (/\.xlsx$/.test(saveTo)) {
         writeExcel(saveTo, unique(array, 1));
@@ -138,7 +111,7 @@ function getFileList(srcFolder, destFolder) {
         }
 
         files.files.forEach(function(val) {
-            if (filter(file.relative(CONFIG.src, val))) {
+            if (filter('/' + file.relative(CONFIG.src, val))) {
                 gfileList.push({
                     fileName: val,
                     fileType: path.extname(val)
@@ -193,6 +166,11 @@ function getLangData(srcdir, saveTo) { //提取入口
             fileName: srcdir,
             fileType: path.extname(srcdir)
         });
+    }
+    if (CONFIG.onlyZH) {
+        langFetchArr.unshift(['zh', 'en'].join(spliter));
+    } else {
+        langFetchArr.unshift(['en', 'other'].join(spliter));
     }
     writeFile(saveTo, langFetchArr);
     writeExcel(path.join(path.dirname(saveTo), 'remark.xlsx'), unique(B.getRemark(), 1));
