@@ -6,14 +6,22 @@ module.exports = function(optionsArr) {
     var optionsObj = {};
     if (optionsArr.length > 0) {
         for (var l = 0, len = optionsArr.length; l < len; l++) {
-            if (optionsArr[l].indexOf('=') > 1) {//Èç¹ûÊÇf=filename.txt
+            if (optionsArr[l].indexOf('=') > 1) {//å¦‚æœæ˜¯f=filename.txt
                 optionsObj[optionsArr[l].split('=')[0].replace(/-+/, '')] = optionsArr[l].split('=')[1];
-            } else if (optionsArr[l].indexOf('-') === 0) {//Èç¹ûÊÇ -f filename.txt
+            } else if (optionsArr[l].indexOf('-') === 0) {//å¦‚æœæ˜¯ -f filename.txt
                 optionsObj[optionsArr[l].substring(1)] = ((typeof optionsArr[l + 1] === 'string') 
                 && optionsArr[l + 1].charAt(0) !== '-') ? (l+=1,optionsArr[l]) : true;
-                console.log(optionsObj)
-            } else {//Èç¹ûÊÇf
+            } else {//å¦‚æœæ˜¯f
                 optionsObj[optionsArr[l].split('=')[0].replace(/-+/, '')] = true;
+            }
+        }
+        if (optionsObj.encode) {//å¦‚æœæœ‰ç¼–ç æ ‡å¿—,åˆ™ä½¿ç”¨decodeURIComponentè§£ç 
+            for (var opt in optionsObj) {
+                try {
+                    optionsObj[opt] = decodeURIComponent(optionsObj[opt]);
+                } catch (e) {
+                    continue;
+                }
             }
         }
         return optionsObj;

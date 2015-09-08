@@ -2,14 +2,19 @@ var jsdom = require('jsdom'),
     fs = require('fs'),
     path = require('path'),
     B = require('./libs/b28lib').b28lib,
-    excludeList = ['.svn', 'goform', 'css', 'images', 'lang', 'fis', 'config.js', 'release.js'];
+    glob = require('./libs/glob'),
+    file = require('./libs/file'),
+    xlsxWriter = require('./libs/xlsx-write');
+
+var includes = '**.{js,html,htm,asp,tpl}';
+var excludes = '**{.svn,jquery,reasy,.min.js,shiv.js,respond.js,b28,shim.js,/libs/}**';
+//或['.svn', 'goform', 'css', 'images', 'lang', 'fis', 'config.js', 'release.js'];
+
 
 var spliter = '\t**--**\t';
 
-var xlsxWriter = require('./libs/xlsx-write');
+var gfileList = [],
 
-var fileList = [],
-    excludeList = excludeList.join(""),
     CONFIG = {
         src: null,
         dest: null,
@@ -68,7 +73,7 @@ function unique(inputs, type) {
 }
 
 
-function readDict(filename) {//读取字典
+function readDict(filename) { //读取字典
     if (path.extname(filename === '.xlsx')) {
         jsonDict.content = require('./libs/xlsx-read').parse(filename);
     } else {
@@ -80,8 +85,6 @@ function writeExcel(filename, array) { //以xlsx形式写入
     xlsxWriter.write(filename, '', array, {
         wscols: [{
             wch: 30
-        }, {
-            wch: 10
         }, {
             wch: 10
         }, {
@@ -109,35 +112,48 @@ function writeFile(saveTo, array) { //提取写入部分
 
 function correctPath(_path) {
     if (!_path) return '';
-    return path.resolve(_path) + '/';
+    return path.resolve(_path);
 }
 
-function getFileList(parentDirectory, destDirectory) {
-    parentDirectory = correctPath(parentDirectory);
-    if (destDirectory) destDirectory = correctPath(destDirectory);
-    var files = fs.readdirSync(parentDirectory);
-    files.forEach(function(val) {
-        if (excludeList.indexOf(val) == -1) {
-            var stat = fs.statSync(parentDirectory + val);
-            if (stat.isDirectory()) {
-                if (destDirectory) {
-                    if (!fs.existsSync(destDirectory + val)) {
-                        fs.mkdirSync(destDirectory + val);
-                    }
+function filter(key) {
+    if (typeof includes === 'string') {
+        includes = glob(includes);
+        excludes = glob(excludes);
+    }
+    //console.log(key)
+    return includes.test(key) && !excludes.test(key);
+}
 
-                    console.log(destDirectory + val + ' create success!');
-                    getFileList(parentDirectory + val, destDirectory + val);
-                } else {
-                    getFileList(parentDirectory + val);
-                }
-            } else {
-                fileList.push({
-                    fileName: parentDirectory + val,
+
+function getFileList(srcFolder, destFolder) {
+    if (!gfileList || gfileList.length === 0) {
+        srcFolder = correctPath(srcFolder);
+
+        var files = file.scanFolder(srcFolder);
+        if (destFolder) {
+            destFolder = correctPath(destFolder);
+            files.folder.forEach(function(val) {
+                file.createFolder(path.join(destFolder, path.relative(srcFolder, val))); //创建目录
+            });
+        }
+
+        files.files.forEach(function(val) {
+            if (filter(file.relative(CONFIG.src, val))) {
+                gfileList.push({
+                    fileName: val,
                     fileType: path.extname(val)
                 });
+            } else if (destFolder) {
+                //如果是翻译模式需要将未匹配的文件原样拷贝
+                var dst = path.join(destFolder, path.relative(srcFolder, val));
+                if (fs.existsSync(val) && !fs.existsSync(dst)) {
+                    file.cp(val, dst);
+                }
             }
-        }
-    });
+        });
+    }
+
+    return gfileList;
 }
 
 function _getPageLangData(page) { //提取html
@@ -157,7 +173,7 @@ function _getResLangData(file) { //提取js
 function doGetLangData(file) { //执行提取
     if (file.fileType == ".js") {
         return _getResLangData(file.fileName);
-    } else if (file.fileType == ".htm" || file.fileType == ".html" || file.fileType == ".tpl" || file.fileType == ".asp") {
+    } else {
         return _getPageLangData(file.fileName);
     }
 }
@@ -166,8 +182,9 @@ function doGetLangData(file) { //执行提取
 function getLangData(srcdir, saveTo) { //提取入口
     var langFetchArr = [];
     if (srcdir && typeof srcdir == 'string' && fs.lstatSync(srcdir).isDirectory()) {
-        getFileList(srcdir);
-        fileList.forEach(function(val) {
+        gfileList = getFileList(srcdir);
+
+        gfileList.forEach(function(val) {
             langFetchArr = langFetchArr.concat(doGetLangData(val));
         });
 
@@ -228,15 +245,11 @@ CONFIG.help = 'usage:\r\n\tnode node_b28.js -src=srcdir -dest=destdir -zh\r\nor 
 var args = require('./libs/getOption')(process.argv.splice(2));
 
 if (!args.h) {
-    if (args.encode) { //url encode for support gbk
-        CONFIG.src = correctPath(decodeURIComponent(args.src));
-        CONFIG.dest = correctPath(decodeURIComponent(args.dest));
-        CONFIG.lang = correctPath(decodeURIComponent(args.lang));
-    } else {
-        CONFIG.src = correctPath(args.src);
-        CONFIG.dest = correctPath(args.dest);
-        CONFIG.lang = correctPath(args.lang);
-    }
+   
+    CONFIG.src = correctPath(args.src);
+    CONFIG.dest = correctPath(args.dest);
+    CONFIG.lang = correctPath(args.lang);
+    
     if (args.src && args.dest) {
         if (args.t) {
             console.log('Translate Mode');
@@ -263,3 +276,4 @@ if (!args.h) {
 } else {
     console.log(CONFIG.help);
 }
+console.log('success!');//返回success

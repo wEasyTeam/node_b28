@@ -4,12 +4,11 @@ var xlsx = require('./libs/xlsx-write');
 var options = require('./libs/getOption')(process.argv.splice(2));
 
 if (options.h || !options.f) {
-  console.log('usage: node JSON2Xlsx.js -f jsonfile.json -o xlsxfile.xlsx');
+  console.log('usage: node ' + path.basename(process.argv[1]) + ' -f jsonfile.json -o xlsxfile.xlsx');
   return;
 }
 
 if (!options.o) {
-  console.log(options.f);
   options.o = path.resolve(options.f).replace(/\.json$/i, '.xlsx');
 }
 
@@ -23,6 +22,8 @@ if (Object.prototype.toString.call(originData) !== '[object Object]') {
 for (var key in originData) {
     jsonData.push([key, originData[key]]);
 }
+jsonData.unshift(['en', 'other Language']);
 //console.log(jsonData);
 
 xlsx.write(options.o, '', jsonData);
+console.log('success!');

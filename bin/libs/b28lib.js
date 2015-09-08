@@ -76,7 +76,7 @@ exports.b28lib = function() {
             } else {
                 transTitleText = doc.title;
             }
-            pageRemark.push('/*   '+ file + '    */');
+            pageRemark.push(addComment(file));
             doc.title = gettext(trim(transTitleText), file);
         },
         replaceTextNodeValue = function(element, file) {
@@ -163,12 +163,12 @@ exports.b28lib = function() {
     }
 
     function translatePage(content, file) {
-        pageRemark.push('/*   '+ file + '    */');
+        pageRemark.push(addComment(file));
         return replaceTextNodeValue(content, file);
     }
 
     function translateRes(content, file) {
-        pageRemark.push('/*   '+ file + '    */');
+        pageRemark.push(addComment(file));
         content = content.replace(/((["'])(?:\\.|[^\\\n])*?\2)/g, function(key) {
             var quote = key.charAt(0);
             key = key.slice(1, key.length - 1);
@@ -178,7 +178,7 @@ exports.b28lib = function() {
                 if (MSG[key]) {
                     return quote + MSG[key] + quote;
                 } else {
-                    pageRemark.push(addInfo(key, content, arguments[3], file))
+                    pageRemark.push([key,file].join(spliter));
                 }
             }
 
@@ -189,13 +189,18 @@ exports.b28lib = function() {
     function GetPageData() {
         var nodeValueArray = [],
             onlyZH = false,
+            pageConent = '',
             page = '';
 
         function _getValue(curValue) {
             if (curValue && /\S/.test(curValue)) {
                 curValue = trim(curValue);
-                if (onlyZH && /[\u4e00-\u9fa5]/.test(curValue) || !onlyZH) { //是否存在中文
+                if (onlyZH && /[\u4e00-\u9fa5]/.test(curValue)) { //是否存在中文
                     nodeValueArray.push(curValue);
+                } else if (/[a-z]/i.test(curValue)) {
+                    nodeValueArray.push(curValue);
+                } else {
+                    pageRemark.push([curValue,page].join(spliter));
                 }
             }
         }
@@ -270,9 +275,12 @@ exports.b28lib = function() {
             }
             onlyZH = _onlyZH;
             page = _page;
-            
+            pageConent = element && element.outerHTML || '';
+            pageRemark.push(addComment(page));
+            nodeValueArray.push(addComment(page));
+
             listNode(element);
-            if (page)nodeValueArray.unshift('\r\n/*-   ' + page + '  -*/');//将文件名添加进来
+   
             return unique(nodeValueArray);
         };
     }
@@ -292,12 +300,15 @@ exports.b28lib = function() {
         };
     }
 
+    function addComment(str) {
+        return '/*----------------------   ' + str + '    ----------------------*/';
+    }
+
     function addInfo(str, data, pos, file) {
         var posToRow = PosToRow(data);
         var row = posToRow(pos);
         return [
         str, 
-        '',
         '  行号:' + row + '  文件:' + file, 
         'http://127.0.0.1:8813/execute.html?execute://' + path.dirname(__dirname) + '\\execute\\notepad2.exe /r /g ' + row + ' ' + file,
         data.substring(data.lastIndexOf('\n', pos - 10), data.indexOf('\n', pos + 10)).replace(/[\n\r]/g, '   ')
@@ -315,18 +326,20 @@ exports.b28lib = function() {
     }
 
     function GetResData(data, onlyZH, file) { //获取js等资源文件内语言
-        var regqutoe2 = new RegExp(/((["'])(?:\\.|[^\\\n])*?\2)/g);
+        var regqutoe = new RegExp(/((["'])(?:\\.|[^\\\n])*?\2)/g);
         var ignoreKeyWord = ['$(', '<%', 'getElementById(', 'find(', 'addClass(', '$.post(', '$.get(', 'delegate(', 'case ', 'hasClass(', 'indexOf(', 'getElementsByTagName(', 'getElementsByClassName(', 'on(', 'setTextDomain(['];
         var matchKeyWord = ['_(', 'showMsg(', 'MSG['];
         var maxBackLen = 25; //定义最长回溯长度,一般js里的关键字长度不会超过25
 
-        var arr = [];
+        var ret = [];
 
-        data.replace(regqutoe2, function(matches) {
+        pageRemark.push(addComment(file));
+
+        data.replace(regqutoe, function(matches) {
             matches = matches.slice(1, matches.length - 1);
             if (matches.trim().length > 0) {
                 if (/[\u4e00-\u9fa5]/.test(matches)) { //是否含有中文
-                    arr.push(matches);
+                    ret.push(matches);
                 } else if (!onlyZH) {
                     if (matches.trim().length > 1 && /[a-z]/i.test(matches)) {
                         var backLength = arguments[3] >= maxBackLen ? maxBackLen : arguments[3]; //计算回溯长度,一般js里的关键字长度不会超过25
@@ -334,17 +347,17 @@ exports.b28lib = function() {
                         var backStr = data.substr(arguments[3] - backLength, backLength);
 
                         if (filter(matchKeyWord, backStr, backLength) || (matches.indexOf(' ') > -1 && !/^[#\.]|/.test(trim(matches)))) { //回溯查找
-                            arr.push(matches);
+                            ret.push(matches);
                         } else if (!filter(ignoreKeyWord, backStr, backLength)) { //无法确定的string添加摘要后输出
-                            //arr.push(addInfo(matches, data, arguments[3], file));
+                            //ret.push(addInfo(matches, data, arguments[3], file));
                             pageRemark.push(addInfo(matches, data, arguments[3], file));
                         }
                     }
                 }
             }
         });
-        if (file)arr.unshift('\r\n/*-   ' + file + '  -*/');//将文件名添加进来
-        return unique(arr);
+        if (file)ret.unshift(addComment(file));//将文件名添加进来
+        return unique(ret);
     }
 
     return {
