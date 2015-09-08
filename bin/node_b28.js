@@ -2,12 +2,13 @@ var jsdom = require('jsdom'),
     fs = require('fs'),
     path = require('path'),
     B = require('./libs/b28lib').b28lib,
-    excludeList = ['.svn', 'goform', 'css', 'images', 'lang'];
+    excludeList = ['.svn', 'goform', 'css', 'images', 'lang', 'fis', 'config.js', 'release.js'];
+
+var spliter = '\t**--**\t';
 
 var xlsxWriter = require('./libs/xlsx-write');
 
 var fileList = [],
-    langFetchArr = [],
     excludeList = excludeList.join(""),
     CONFIG = {
         src: null,
@@ -45,22 +46,6 @@ var easyUTF8 = function(gbk) {
     return utf8.join('');
 };
 
-function getOptions(optionsArr) {
-    var optionsObj = {};
-    if (optionsArr.length > 0) {
-        for (var l = optionsArr.length - 1; l >= 0; l--) {
-            if (optionsArr[l].indexOf('=') > 1) {
-                optionsObj[optionsArr[l].split('=')[0].replace(/-+/, '')] = optionsArr[l].split('=')[1];
-            } else {
-                optionsObj[optionsArr[l].split('=')[0].replace(/-+/, '')] = true;
-            }
-        }
-        return optionsObj;
-    }
-    return {
-        h: true
-    };
-}
 
 function unique(inputs, type) {
     var res = [];
@@ -69,9 +54,11 @@ function unique(inputs, type) {
         return [];
     }
     for (var i = 0; i < inputs.length; i++) {
+        if (typeof inputs[i] === 'undefined') continue;
+
         if (!json[inputs[i]]) {
             if (type === 1) {
-              inputs[i] = inputs[i].split('\t:\t');
+                inputs[i] = inputs[i].split(spliter);
             }
             res.push(inputs[i]);
             json[inputs[i]] = 1;
@@ -81,51 +68,47 @@ function unique(inputs, type) {
 }
 
 
-function readDict(filename) {
+function readDict(filename) {//读取字典
     if (path.extname(filename === '.xlsx')) {
-        jsonDict.content = require('./libs/xlsx-read').parse(filename); 
+        jsonDict.content = require('./libs/xlsx-read').parse(filename);
     } else {
         jsonDict.content = fs.readFileSync(filename, 'utf-8');
     }
 }
 
-function writeExcel(filename, array) {
-  xlsxWriter.write(filename, '', array, {
-    wscols: [{wch:30}, {wch:10}, {wch:10}, {wch:0.0000000000001}, {wch:100}]
-  }); 
-  console.log(filename + ' success saved!');
+function writeExcel(filename, array) { //以xlsx形式写入
+    xlsxWriter.write(filename, '', array, {
+        wscols: [{
+            wch: 30
+        }, {
+            wch: 10
+        }, {
+            wch: 10
+        }, {
+            wch: 0.0000000000001
+        }, {
+            wch: 100
+        }]
+    });
+    console.log(filename + ' success saved!');
 }
 
-function writeFile(filename, content) {
+function writeText(filename, content) { //以文本形式写入
     fs.writeFileSync(filename, content);
     console.log(filename + ' success saved!');
 }
 
-function writeFiles(saveTo) {
+function writeFile(saveTo, array) { //提取写入部分
+    saveTo = path.resolve(saveTo);
     if (/\.xlsx$/.test(saveTo)) {
-      writeExcel(saveTo, unique(langFetchArr, 1));
+        writeExcel(saveTo, unique(array, 1));
     } else {
-      writeFile(saveTo, unique(langFetchArr).join("\r\n"));
-    }
-}
-
-function fetchWrite(saveTo, array) {
-    if (/\.xls(x)?$/.test(saveTo)) {
-      writeExcel(saveTo, unique(array, 1));
-    } else {
-      writeFile(saveTo, unique(array).join("\r\n"));
+        writeText(saveTo, unique(array, 1).join("\r\n"));
     }
 }
 
 function correctPath(_path) {
     if (!_path) return '';
-    /*if (!path.extname(_path)) { // if is a directory
-        _path = _path.replace(/([^\\/]$)/g, "$1\\");
-    }
-
-    if (_path.indexOf(' ') > -1) {
-        _path = '"' + _path + '"';
-    }*/
     return path.resolve(_path) + '/';
 }
 
@@ -157,84 +140,62 @@ function getFileList(parentDirectory, destDirectory) {
     });
 }
 
-function _getPageLangData(page, saveTo, callback) {//提取html
+function _getPageLangData(page) { //提取html
     var content = fs.readFileSync(page, 'utf-8');
     var document = jsdom.jsdom(content);
-    var arr = new B.getPageData(document.documentElement, CONFIG.onlyZH);
-    if (saveTo && saveTo !== "" && typeof saveTo == "string") {
-        fetchWrite(saveTo, arr);
-    } else {
-        if (typeof saveTo == "function") {
-            callback = saveTo;
-        }
-    }
-
-    if (callback) {
-        callback.call(null, arr);
-    }
+    var arr = new B.getPageData(document.documentElement, CONFIG.onlyZH, path.resolve(page));
     return arr;
 }
 
-function _getResLangData(file, saveTo, callback) {//提取js
+function _getResLangData(file) { //提取js
     var content = fs.readFileSync(file, 'utf-8');
     var arr = new B.getResData(content, CONFIG.onlyZH, path.resolve(file));
-
-    if (saveTo && saveTo !== "" && typeof saveTo == "string") {
-        fetchWrite(saveTo, arr);
-    } else {
-        if (typeof saveTo == "function") {
-            callback = saveTo;
-        }
-    }
-    if (callback) {
-        callback.call(null, arr);
-    }
+    return arr;
 }
 
 
-function doGetLangData(file, savepath) {//执行提取
-    var path = savepath || function(data) {
-        langFetchArr = langFetchArr.concat('\r\n/*-  ' + file.fileName + '  -*/', data);
-    };
-
+function doGetLangData(file) { //执行提取
     if (file.fileType == ".js") {
-        _getResLangData(file.fileName, path);
-    } else if (file.fileType == ".htm" || file.fileType == ".html" || file.fileType == ".asp") {
-        _getPageLangData(file.fileName, path);
+        return _getResLangData(file.fileName);
+    } else if (file.fileType == ".htm" || file.fileType == ".html" || file.fileType == ".tpl" || file.fileType == ".asp") {
+        return _getPageLangData(file.fileName);
     }
 }
 
 
-function getLangData(srcdir, saveTo) {//提取入口
+function getLangData(srcdir, saveTo) { //提取入口
+    var langFetchArr = [];
     if (srcdir && typeof srcdir == 'string' && fs.lstatSync(srcdir).isDirectory()) {
         getFileList(srcdir);
         fileList.forEach(function(val) {
-            doGetLangData(val);
+            langFetchArr = langFetchArr.concat(doGetLangData(val));
         });
-        writeFiles(saveTo);
+
     } else {
-        doGetLangData({
+        langFetchArr = doGetLangData({
             fileName: srcdir,
             fileType: path.extname(srcdir)
-        }, saveTo);
+        });
     }
+    writeFile(saveTo, langFetchArr);
+    writeExcel(path.join(path.dirname(saveTo), 'remark.xlsx'), unique(B.getRemark(), 1));
 }
 
-function _translatePage(page, saveTo) {//翻译html
+function _translatePage(page, saveTo) { //翻译html
     var content = fs.readFileSync(page, 'utf-8');
     var document = jsdom.jsdom(content);
     B.transTitle(document, path.resolve(page));
     B.translatePage(document, path.resolve(page));
-    writeFile(saveTo, "<!DOCTYPE html>\r\n" + document.documentElement.outerHTML);
+    writeText(saveTo, "<!DOCTYPE html>\r\n" + document.documentElement.outerHTML);
 }
 
-function _translateRes(file, saveTo) {//翻译js
+function _translateRes(file, saveTo) { //翻译js
     var content = fs.readFileSync(file, 'utf-8');
     var ret = B.translateRes(content, path.resolve(file));
-    writeFile(saveTo, ret);
+    writeText(saveTo, ret);
 }
 
-function doTranslate(file, savepath) {//执行翻译
+function doTranslate(file, savepath) { //执行翻译
     if (file.fileType == ".js") {
         _translateRes(file.fileName, savepath);
     } else if (file.fileType == ".htm" || file.fileType == ".html" || file.fileType == ".asp") {
@@ -242,8 +203,8 @@ function doTranslate(file, savepath) {//执行翻译
     }
 }
 
-function translatePage(srcdir, saveTo) {//翻译入口
-    if (srcdir && typeof srcdir == 'string' && fs.statSync(srcdir).isDirectory()) {//如果是目录,先扫描目录
+function translatePage(srcdir, saveTo) { //翻译入口
+    if (srcdir && typeof srcdir == 'string' && fs.statSync(srcdir).isDirectory()) { //如果是目录,先扫描目录
         getFileList(srcdir, saveTo);
         fileList.forEach(function(val) {
             doTranslate(val, val.fileName.replace(srcdir, saveTo));
@@ -254,7 +215,6 @@ function translatePage(srcdir, saveTo) {//翻译入口
             fileName: srcdir
         }, saveTo);
     }
-    
     writeExcel(path.join(path.dirname(CONFIG.lang), 'remark.xlsx'), unique(B.getRemark(), 1));
 }
 
@@ -265,7 +225,7 @@ CONFIG.help = 'usage:\r\n\tnode node_b28.js -src=srcdir -dest=destdir -zh\r\nor 
 
 
 
-var args = new getOptions(process.argv.splice(2));
+var args = require('./libs/getOption')(process.argv.splice(2));
 
 if (!args.h) {
     if (args.encode) { //url encode for support gbk
