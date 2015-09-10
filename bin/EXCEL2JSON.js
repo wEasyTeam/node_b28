@@ -4,6 +4,8 @@ var path = require('path');
 var core = require('./libs/reasy-command-b28');
 var file = require('./libs/file');
 var options = require('./libs/getOption')(process.argv.splice(2));
+var console = require('./libs/console');
+
 
 function fixPath(_path) {
     if (!file.isAbsolute(_path)) {

@@ -4,7 +4,8 @@ var jsdom = require('jsdom'),
     B = require('./libs/b28lib').b28lib,
     glob = require('./libs/glob'),
     file = require('./libs/file'),
-    xlsxWriter = require('./libs/xlsx-write');
+    xlsxWriter = require('./libs/xlsx-write'),
+    console = require('./libs/console');
 
 var includes = '**.{js,html,htm,asp,tpl}';
 var excludes = '**{.svn,.git,jquery,reasy,.min.js,shiv.js,respond.js,b28,shim.js,/libs/,/goform/,/cgi-bin/}**';

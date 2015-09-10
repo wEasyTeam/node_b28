@@ -1,5 +1,6 @@
 var path = require('path');
 var xlsx = require('./libs/xlsx-write');
+var console = require('./libs/console');
 
 var options = require('./libs/getOption')(process.argv.splice(2));
 

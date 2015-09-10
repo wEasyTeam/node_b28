@@ -186,7 +186,7 @@ exports.b28lib = function() {
         return content;
     }
 
-    function GetPageData() {
+    function GetPageData() {//提取html页面关键字
         var nodeValueArray = [],
             onlyZH = false,
             pageConent = '',
@@ -195,8 +195,10 @@ exports.b28lib = function() {
         function _getValue(curValue) {
             if (curValue && /\S/.test(curValue)) {
                 curValue = trim(curValue);
-                if (onlyZH && /[\u4e00-\u9fa5]/.test(curValue)) { //是否存在中文
-                    nodeValueArray.push(curValue);
+                if (onlyZH) { //是否存在中文
+                    if (/[\u4e00-\u9fa5]/.test(curValue)) {
+                        nodeValueArray.push(curValue);
+                    }
                 } else if (/[a-z]/i.test(curValue)) {
                     nodeValueArray.push(curValue);
                 } else {
